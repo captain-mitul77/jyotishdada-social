@@ -1,0 +1,112 @@
+name: Daily social post
+
+on:
+  schedule:
+    - cron: "23 0 * * *"        # 00:23 UTC = 05:53 IST (off the busy :00 mark; GitHub may delay cron by a few minutes)
+  workflow_dispatch:
+    inputs:
+      post_date:
+        description: "YYYY-MM-DD (blank = today in IST)"
+        required: false
+      platforms:
+        description: "Comma list: telegram,facebook,instagram,youtube (blank = all with secrets)"
+        required: false
+      dry_run:
+        description: "true = generate and publish media only, post nowhere"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-social
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      API_BASE: ${{ vars.API_BASE || 'https://api.jyotishdada.com' }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://jyotishdada.com' }}
+      CITY_SLUG: ${{ vars.CITY_SLUG || 'delhi' }}
+      POST_DATE: ${{ github.event.inputs.post_date }}
+      PLATFORMS: ${{ github.event.inputs.platforms || vars.PLATFORMS || 'telegram,facebook,instagram,youtube' }}
+      PAGES_BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/media
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ffmpeg + text-shaping libs (Devanagari needs raqm)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libraqm0 libfribidi0
+          pip install -r requirements.txt
+
+      - name: Generate card, story and reel
+        run: python src/make_posts.py
+
+      - name: Publish media to the gh-pages branch (public URLs for Instagram/Facebook)
+        run: |
+          DATE=$(ls out | sort | tail -1)
+          echo "DATE=$DATE" >> "$GITHUB_ENV"
+          git config user.name  "jyotishdada-bot"
+          git config user.email "jyotishdada-bot@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add pages -B gh-pages origin/gh-pages
+          else
+            git worktree add --detach pages
+            (cd pages && git checkout --orphan gh-pages && git rm -rf . -q)
+          fi
+          mkdir -p pages/media
+          # a manual re-run must not double-post: bring yesterday's ledger for this date back first
+          cp "pages/media/$DATE/posted.json" "out/$DATE/posted.json" 2>/dev/null || true
+          rm -rf "pages/media/$DATE" && cp -r "out/$DATE" "pages/media/$DATE"
+          ls pages/media | sort | head -n -7 | xargs -r -I{} rm -rf "pages/media/{}"   # keep the last 7 days only
+          touch pages/.nojekyll
+          printf '<!doctype html><meta charset=utf-8><title>JyotishDada media</title>Media host for social posts.' > pages/index.html
+          cd pages && git add -A && git commit -m "media $DATE" --allow-empty -q && git push origin gh-pages
+
+      - name: Post to the networks
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL: ${{ secrets.TELEGRAM_CHANNEL }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          YT_PRIVACY: ${{ vars.YT_PRIVACY || 'private' }}
+          GRAPH_VERSION: ${{ vars.GRAPH_VERSION || 'v23.0' }}
+        run: python src/publish.py "out/$DATE"
+
+      - name: Save the posted-ledger so a re-run cannot double-post
+        if: always()
+        run: |
+          cp "out/$DATE/posted.json" "pages/media/$DATE/posted.json" 2>/dev/null || exit 0
+          cd pages && git add -A && (git diff --cached --quiet || git commit -m "ledger $DATE" -q && git push origin gh-pages)
+
+      - name: Keep the schedule alive (GitHub pauses cron in repos with 60 days of no commits)
+        if: always()
+        run: |
+          LAST=$(git log -1 --format=%ct origin/${{ github.event.repository.default_branch }} 2>/dev/null || git log -1 --format=%ct)
+          if [ $(( $(date +%s) - LAST )) -gt $(( 45*24*3600 )) ]; then
+            git checkout ${{ github.event.repository.default_branch }} 2>/dev/null || true
+            git commit --allow-empty -m "chore: keep scheduled workflow active" -q && git push origin HEAD
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: social-${{ env.DATE }}
+          path: out/
+          retention-days: 3

@@ -1,0 +1,24 @@
+--- /tmp/siteConfig.orig	2026-11-09 16:20:03.923482908 +0000
++++ lib/siteConfig.ts	2026-11-09 16:20:03.939265743 +0000
+@@ -138,7 +138,7 @@
+  * set — no invented handles. Set once the Facebook/Instagram pages exist:
+  *   NEXT_PUBLIC_FACEBOOK_URL=https://www.facebook.com/<page>
+  *   NEXT_PUBLIC_INSTAGRAM_URL=https://www.instagram.com/<handle>
+- * (Optional: NEXT_PUBLIC_YOUTUBE_URL, NEXT_PUBLIC_X_URL, NEXT_PUBLIC_WHATSAPP_CHANNEL_URL.)
++ * (Optional: NEXT_PUBLIC_YOUTUBE_URL, NEXT_PUBLIC_TELEGRAM_URL (Sprint 123), NEXT_PUBLIC_X_URL, NEXT_PUBLIC_WHATSAPP_CHANNEL_URL.)
+  * NEXT_PUBLIC_* values are inlined at build time on Cloudflare — see the
+  * build-vs-runtime env note in DEPLOYMENT.md before assuming a runtime set works.
+  */
+@@ -146,6 +146,7 @@
+   { label: "Facebook", href: process.env.NEXT_PUBLIC_FACEBOOK_URL ?? "" },
+   { label: "Instagram", href: process.env.NEXT_PUBLIC_INSTAGRAM_URL ?? "" },
+   { label: "YouTube", href: process.env.NEXT_PUBLIC_YOUTUBE_URL ?? "" },
++  { label: "Telegram", href: process.env.NEXT_PUBLIC_TELEGRAM_URL ?? "" },
+   { label: "X", href: process.env.NEXT_PUBLIC_X_URL ?? "" },
+   {
+     label: "WhatsApp Channel",
+--- /tmp/SPRINT_LOG.orig	2026-11-09 16:20:03.927661557 +0000
++++ SPRINT_LOG.md	2026-11-09 16:20:03.941810467 +0000
+@@ -28,6 +28,14 @@
+ 
+ | Sprint | Focus | Endpoints | Status | Date | Notes |
