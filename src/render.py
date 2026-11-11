@@ -19,6 +19,8 @@ CREAM, MAROON, MARIGOLD, GOLD, INDIGO, INK, WHITE = (
     "#FBF3E7", "#6B1E23", "#E8A33D", "#C9A227", "#2C3454", "#2B1B12", "#FFFFFF")
 SOFT_MARIGOLD = "#F6D58E"
 
+NOT_TODAY_HI = "आज नहीं (बुधवार को नहीं माना जाता)"
+
 _cache = {}
 
 
@@ -165,8 +167,12 @@ def _time_card(d, box, label_hi, label_en, value, kind):
     fill, fg, sub = (MARIGOLD, INK, "#5A3A0C") if good else (MAROON, CREAM, SOFT_MARIGOLD)
     rrect(d, box, 28, fill=fill)
     text(d, (x0 + 32, y0 + 22), f"{label_hi}  ·  {label_en}", deva(30, 700), sub)
-    v = window(value) or "—"
-    f = fit(d, v, lambda s: display(s, 700), x1 - x0 - 64, 62, 30)
+    if not value or str(value).strip().lower() == "none":
+        # The backend returns "None" when the muhurta does not apply that day (Abhijit is skipped on Wednesdays).
+        v, mk = NOT_TODAY_HI, (lambda s: deva(s, 700))
+    else:
+        v, mk = window(value), (lambda s: display(s, 700))
+    f = fit(d, v, mk, x1 - x0 - 64, 62, 30)
     text(d, (x0 + 32, y1 - 24), v, f, fg, "ls")
 
 

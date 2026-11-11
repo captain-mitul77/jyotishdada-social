@@ -9,6 +9,11 @@ BASE_TAGS = ["#आजकापंचांग", "#Panchang", "#AajKaPanchang", "
              "#VedicAstrology", "#RahuKaal", "#Tithi", "#Nakshatra", "#Sanatan"]
 
 
+def _abhijit(v: str) -> str:
+    """Backend returns the string "None" when Abhijit does not apply (Wednesdays)."""
+    return "आज नहीं (बुधवार को नहीं माना जाता)" if not v or str(v).strip().lower() == "none" else window(v)
+
+
 def _tags(c: Ctx) -> str:
     tags = list(BASE_TAGS)
     for ev in c.today_events[:1]:
@@ -33,7 +38,7 @@ def _lines(c: Ctx) -> list[str]:
             f"🧘 योग: {c.yoga_hi}  |  करण: {c.kar_hi}",
             f"🌅 सूर्योदय {p['sunrise']}  |  🌇 सूर्यास्त {p['sunset']}",
             "",
-            f"✅ अभिजीत मुहूर्त: {window(p.get('abhijit', ''))}",
+            f"✅ अभिजीत मुहूर्त: {_abhijit(p.get('abhijit', ''))}",
             f"⚠️ राहु काल: {window(p.get('rahuKalam', ''))}",
             ""]
     return out
