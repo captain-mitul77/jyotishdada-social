@@ -2,7 +2,11 @@ name: Daily social post
 
 on:
   schedule:
-    - cron: "23 0 * * *"        # 00:23 UTC = 05:53 IST (off the busy :00 mark; GitHub may delay cron by a few minutes)
+    # GitHub may delay or drop scheduled runs, so there are three. The posted-ledger makes the later ones harmless:
+    # platforms already posted are skipped, platforms that failed or never ran are retried.
+    - cron: "23 0 * * *"        # 05:53 IST (main run)
+    - cron: "47 1 * * *"        # 07:17 IST (backup)
+    - cron: "13 3 * * *"        # 08:43 IST (last backup)
   workflow_dispatch:
     inputs:
       post_date:
@@ -71,7 +75,8 @@ jobs:
           ls pages/media | sort | head -n -7 | xargs -r -I{} rm -rf "pages/media/{}"   # keep the last 7 days only
           touch pages/.nojekyll
           printf '<!doctype html><meta charset=utf-8><title>JyotishDada media</title>Media host for social posts.' > pages/index.html
-          cd pages && git add -A && git commit -m "media $DATE" --allow-empty -q && git push origin gh-pages
+          # Single-commit branch: old pictures never pile up in git history (history would grow ~5 MB/day forever)
+          cd pages && git checkout --orphan clean -q && git add -A && git commit -q -m "media $DATE" && git push -f origin clean:gh-pages
 
       - name: Post to the networks
         if: ${{ github.event.inputs.dry_run != 'true' }}
@@ -93,7 +98,7 @@ jobs:
         if: always()
         run: |
           cp "out/$DATE/posted.json" "pages/media/$DATE/posted.json" 2>/dev/null || exit 0
-          cd pages && git add -A && (git diff --cached --quiet || git commit -m "ledger $DATE" -q && git push origin gh-pages)
+          cd pages && git add -A && (git diff --cached --quiet || (git commit --amend -q --no-edit && git push -f origin HEAD:gh-pages))
 
       - name: Keep the schedule alive (GitHub pauses cron in repos with 60 days of no commits)
         if: always()
